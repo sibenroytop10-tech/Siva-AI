@@ -59,13 +59,6 @@ async function sivaReply(question) {
         return "Internet ya server connection mein problem hai.";
     }
 }
-function ask() {
-  const q = input.value.trim();
-
-  if (!q) return;
-
-  addMessage(q, true);
-  input.value = "";
 async function ask() {
     const q = input.value.trim();
 
