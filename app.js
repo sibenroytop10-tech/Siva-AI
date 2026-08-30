@@ -33,39 +33,32 @@ function escapeHtml(text) {
     .replaceAll("'", "&#039;");
 }
 
-// Temporary AI reply
-// API baad mein isi function mein connect karenge.
-function sivaReply(question) {
-  const q = question.toLowerCase();
+// Gemini AI reply
+async function sivaReply(question) {
+    try {
+        const response = await fetch("/api/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                message: question
+            })
+        });
 
-  if (
-    q.includes("hello") ||
-    q.includes("hi") ||
-    q.includes("namaste") ||
-    q.includes("siva")
-  ) {
-    return "Namaskar! 🙏 Main Siva AI hoon. Aap mujhse kuch bhi pooch sakte hain.";
-  }
+        const data = await response.json();
 
-  if (
-    q.includes("assam") ||
-    q.includes("অসম") ||
-    q.includes("assamese")
-  ) {
-    return "নমস্কাৰ! 🙏 মই Siva AI। আপুনি অসমীয়া, Hindi বা English-ত মোৰ সৈতে কথা পাতিব পাৰে।";
-  }
+        if (!response.ok) {
+            return data.error || "Sorry, AI se response nahi mila.";
+        }
 
-  if (q.includes("who are you") || q.includes("tum kaun")) {
-    return "Main Siva AI hoon — aapka personal AI assistant. 🤖";
-  }
+        return data.reply || "Sorry, mujhe response nahi mila.";
 
-  if (q.includes("help") || q.includes("madad")) {
-    return "Bilkul! 😊 Aap apna question type kijiye, main help karne ki koshish karunga.";
-  }
-
-  return "Samajh gaya. 👍 Abhi main demo mode mein hoon. Real AI API connect hone ke baad main aapko intelligent answers dunga.";
+    } catch (error) {
+        console.error("AI Error:", error);
+        return "Internet ya server connection mein problem hai.";
+    }
 }
-
 function ask() {
   const q = input.value.trim();
 
@@ -73,25 +66,54 @@ function ask() {
 
   addMessage(q, true);
   input.value = "";
+async function ask() {
+    const q = input.value.trim();
 
-  chats.push({
-    user: q,
-    time: Date.now()
-  });
+    if (!q) return;
 
-  saveChats();
+    addMessage(q, true);
+    input.value = "";
+    input.disabled = true;
 
-  setTimeout(() => {
-    addMessage(sivaReply(q));
-  }, 500);
+    const typing = document.createElement("div");
+    typing.className = "msg bot";
+    typing.id = "typing";
+
+    typing.innerHTML = `
+        <div class="avatar">✦</div>
+        <div class="bubble">Siva AI is thinking...</div>
+    `;
+
+    chat.appendChild(typing);
+    chat.scrollTop = chat.scrollHeight;
+
+    try {
+        const reply = await sivaReply(q);
+
+        const oldTyping = document.getElementById("typing");
+        if (oldTyping) oldTyping.remove();
+
+        addMessage(reply);
+
+        chats.push({
+            user: q,
+            bot: reply,
+            time: Date.now()
+        });
+
+        saveChats();
+
+    } catch (error) {
+        const oldTyping = document.getElementById("typing");
+        if (oldTyping) oldTyping.remove();
+
+        addMessage("Sorry, kuch problem ho gayi. Please try again.");
+        console.error(error);
+    }
+
+    input.disabled = false;
+    input.focus();
 }
-
-if (send) {
-  send.onclick = ask;
-}
-
-if (input) {
-  input.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       ask();
