@@ -8,24 +8,8 @@ function saveChats() {
   localStorage.setItem("siva_chats", JSON.stringify(chats));
 }
 
-function addMessage(text, me = false) {
-  const welcome = document.querySelector("#welcome");
-  if (welcome) welcome.remove();
-
-  const row = document.createElement("div");
-  row.className = "msg " + (me ? "user" : "bot");
-
-  row.innerHTML = `
-    <div class="avatar">${me ? "U" : "✦"}</div>
-    <div class="bubble">${escapeHtml(text)}</div>
-  `;
-
-  chat.appendChild(row);
-  chat.scrollTop = chat.scrollHeight;
-}
-
 function escapeHtml(text) {
-  return text
+  return String(text)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -33,163 +17,285 @@ function escapeHtml(text) {
     .replaceAll("'", "&#039;");
 }
 
-// Gemini AI reply
-async function sivaReply(question) {
-    try {
-        const response = await fetch("/api/chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                message: question
-            })
-        });
+function addMessage(text, me = false) {
+  const welcome = document.querySelector("#welcome");
 
-        const data = await response.json();
+  if (welcome) {
+    welcome.remove();
+  }
 
-        if (!response.ok) {
-            return data.error || "Sorry, AI se response nahi mila.";
-        }
+  const row = document.createElement("div");
 
-        return data.reply || "Sorry, mujhe response nahi mila.";
+  row.className = "msg " + (me ? "user" : "bot");
 
-    } catch (error) {
-        console.error("AI Error:", error);
-        return "Internet ya server connection mein problem hai.";
-    }
+  row.innerHTML = `
+    <div class="avatar">${me ? "U" : "✦"}</div>
+    <div class="bubble">${escapeHtml(text)}</div>
+  `;
+
+  if (chat) {
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+  }
 }
+
+/* ==============================
+   AI REPLY
+   API/backend ko yahan directly
+   include nahi kiya gaya hai.
+   /api/chat endpoint ko call karega.
+================================ */
+
+async function sivaReply(question) {
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: question
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return data.error || "Sorry, AI se response nahi mila.";
+    }
+
+    return data.reply || "Sorry, mujhe response nahi mila.";
+
+  } catch (error) {
+    console.error("AI Error:", error);
+    return "Internet ya server connection mein problem hai.";
+  }
+}
+
+/* ==============================
+   SEND MESSAGE
+================================ */
+
 async function ask() {
-    const q = input.value.trim();
+  const q = input.value.trim();
 
-    if (!q) return;
+  if (!q) return;
 
-    addMessage(q, true);
-    input.value = "";
-    input.disabled = true;
+  addMessage(q, true);
 
-    const typing = document.createElement("div");
-    typing.className = "msg bot";
-    typing.id = "typing";
+  input.value = "";
+  input.disabled = true;
 
-    typing.innerHTML = `
-        <div class="avatar">✦</div>
-        <div class="bubble">Siva AI is thinking...</div>
-    `;
+  const typing = document.createElement("div");
 
+  typing.className = "msg bot";
+  typing.id = "typing";
+
+  typing.innerHTML = `
+    <div class="avatar">✦</div>
+    <div class="bubble">Siva AI is thinking...</div>
+  `;
+
+  if (chat) {
     chat.appendChild(typing);
     chat.scrollTop = chat.scrollHeight;
+  }
 
-    try {
-        const reply = await sivaReply(q);
+  try {
+    const reply = await sivaReply(q);
 
-        const oldTyping = document.getElementById("typing");
-        if (oldTyping) oldTyping.remove();
+    const oldTyping = document.querySelector("#typing");
 
-        addMessage(reply);
-
-        chats.push({
-            user: q,
-            bot: reply,
-            time: Date.now()
-        });
-
-        saveChats();
-
-    } catch (error) {
-        const oldTyping = document.getElementById("typing");
-        if (oldTyping) oldTyping.remove();
-
-        addMessage("Sorry, kuch problem ho gayi. Please try again.");
-        console.error(error);
+    if (oldTyping) {
+      oldTyping.remove();
     }
 
+    addMessage(reply);
+
+    chats.push({
+      user: q,
+      bot: reply,
+      time: Date.now()
+    });
+
+    saveChats();
+
+  } catch (error) {
+
+    const oldTyping = document.querySelector("#typing");
+
+    if (oldTyping) {
+      oldTyping.remove();
+    }
+
+    addMessage("Sorry, kuch problem ho gayi. Please try again.");
+
+    console.error(error);
+
+  } finally {
     input.disabled = false;
     input.focus();
+  }
 }
+
+/* ==============================
+   SEND BUTTON
+================================ */
+
+if (send) {
+  send.onclick = ask;
+}
+
+/* ==============================
+   ENTER TO SEND
+================================ */
+
+if (input) {
+  input.addEventListener("keydown", function(e) {
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       ask();
     }
+
   });
 }
 
-// Suggestion buttons
-document.querySelectorAll(".suggestion, .suggestions button").forEach(btn => {
-  btn.onclick = () => {
-    input.value = btn.textContent.trim();
-    input.focus();
-  };
-});
+/* ==============================
+   SUGGESTION BUTTONS
+================================ */
 
-// New chat
+document
+  .querySelectorAll(".suggestion, .suggestions button")
+  .forEach(btn => {
+
+    btn.onclick = () => {
+
+      if (!input) return;
+
+      input.value = btn.textContent.trim();
+      input.focus();
+
+    };
+
+  });
+
+/* ==============================
+   NEW CHAT
+================================ */
+
 const newChat = document.querySelector("#newChat");
 
 if (newChat) {
+
   newChat.onclick = () => {
+
     localStorage.removeItem("siva_chats");
+
+    chats = [];
+
     location.reload();
+
   };
+
 }
 
-// Mobile sidebar
+/* ==============================
+   MOBILE SIDEBAR
+================================ */
+
 const menu = document.querySelector("#menu");
 const sidebar = document.querySelector("#sidebar");
 const closeSide = document.querySelector("#closeSide");
 
 if (menu && sidebar) {
-  menu.onclick = () => sidebar.classList.add("open");
+
+  menu.onclick = () => {
+    sidebar.classList.add("open");
+  };
+
 }
 
 if (closeSide && sidebar) {
-  closeSide.onclick = () => sidebar.classList.remove("open");
+
+  closeSide.onclick = () => {
+    sidebar.classList.remove("open");
+  };
+
 }
 
-// Dark mode
+/* ==============================
+   DARK MODE
+================================ */
+
 const theme = document.querySelector("#theme");
 
 if (theme) {
+
   theme.onclick = () => {
+
     document.body.classList.toggle("dark");
 
     localStorage.setItem(
       "siva_dark",
       document.body.classList.contains("dark")
     );
+
   };
+
 }
 
-// Restore dark mode
+/* Restore dark mode */
+
 if (localStorage.getItem("siva_dark") === "true") {
+
   document.body.classList.add("dark");
+
 }
 
-// File selection
+/* ==============================
+   FILE SELECTION
+================================ */
+
 const file = document.querySelector("#file");
 const fileName = document.querySelector("#fileName");
 
 if (file) {
+
   file.onchange = e => {
+
     const selected = e.target.files[0];
 
     if (selected && fileName) {
       fileName.textContent = selected.name;
     }
+
   };
+
 }
 
-// Voice input
+/* ==============================
+   VOICE INPUT
+================================ */
+
 const mic = document.querySelector("#mic");
 
 if (mic) {
+
   mic.onclick = () => {
+
     const SpeechRecognition =
       window.SpeechRecognition ||
       window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert("Voice input is not supported in this browser.");
+
+      alert(
+        "Voice input is not supported in this browser."
+      );
+
       return;
+
     }
 
     const recognition = new SpeechRecognition();
@@ -198,9 +304,54 @@ if (mic) {
     recognition.interimResults = false;
 
     recognition.onresult = event => {
-      input.value = event.results[0][0].transcript;
+
+      if (input) {
+        input.value =
+          event.results[0][0].transcript;
+
+        input.focus();
+      }
+
+    };
+
+    recognition.onerror = error => {
+      console.error("Voice Error:", error);
     };
 
     recognition.start();
+
   };
+
+}
+
+/* ==============================
+   LOAD CHAT HISTORY
+================================ */
+
+function loadChats() {
+
+  if (!chat || !Array.isArray(chats)) {
+    return;
+  }
+
+  chats.forEach(item => {
+
+    if (item.user) {
+      addMessage(item.user, true);
+    }
+
+    if (item.bot) {
+      addMessage(item.bot);
+    }
+
+  });
+
+}
+
+/* ==============================
+   START
+================================ */
+
+if (chats.length > 0) {
+  loadChats();
 }
